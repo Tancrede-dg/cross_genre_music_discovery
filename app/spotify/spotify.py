@@ -1,20 +1,24 @@
 import requests
-from spotipy.oauth2 import SpotifyPKCE, CacheFileHandler
-from IPython.display import HTML, display
+import json
+import re
 import pandas as pd
-import streamlit.components.v1 as components
+import streamlit as st
+
+from spotipy.oauth2 import SpotifyPKCE, CacheFileHandler
 
 
 
-CLIENT_ID = "f1f9e4ee251c4d0993747e73c48d6cce"
-PLAYLIST_ID = "33aWOeIiteZ2thsep1QGzN"
+
+CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
+REDIRECT_URI = st.secrets.get("SPOTIPY_REDIRECT_URI")
+REFRESH_TOKEN = st.secrets.get("SPOTIFY_REFRESH_TOKEN")
 
 
 
 """
 How to use Spotify
     1. Get access token
-    2. Create a playlist OR reuse the one that is listed above
+    2. Create a playlist
     3. Add the tracks to the playlist
     4. Show the player with the playlist
 """
@@ -22,21 +26,23 @@ How to use Spotify
 
 def get_access_token():
     """
-    Connects to the Cross-Genre Music Discovery app and requests an access token
+    Connects to the Cross-Genre Music Discovery app of Spotify and requests an access token
     """
 
     auth_manager = SpotifyPKCE(
-        client_id="f1f9e4ee251c4d0993747e73c48d6cce",
-        redirect_uri="http://127.0.0.1:9090/callback",
+        client_id=CLIENT_ID,
+        redirect_uri=REDIRECT_URI,
         scope="playlist-modify-public",
         cache_handler=CacheFileHandler(
             cache_path=".spotify_token_cache"
-        )
+        ),
+        open_browser=False
     )
 
-    token = auth_manager.get_access_token()
+    # use the refresh token to get an access token
+    token_info = auth_manager.refresh_access_token(REFRESH_TOKEN)
 
-    return token
+    return token_info["access_token"]
 
 
 def create_playlist(access_token):
@@ -114,8 +120,10 @@ def add_tracks_to_playlist(access_token, playlist_id, track_ids):
 
 
 def display_player(playlist_id):
+    from IPython.display import HTML, display
     """
         Shows the Spotify player with the playlist
+        Use in Notebook
     """
 
     display(HTML(f"""
@@ -133,10 +141,88 @@ def display_player(playlist_id):
 
 def display_player_streamlit(playlist_id):
     """
-    Shows the Spotify player with the playlist in Streamlit.
+    Displays a Spotify playlist with a reload button.
+    Reloading does not rerun the Streamlit application.
     """
-    components.iframe(
-        src=f"https://open.spotify.com/embed/playlist/{playlist_id}",
-        height=600,
-        scrolling=False
+
+    url = f"https://open.spotify.com/embed/playlist/{playlist_id}"
+
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {
+                margin: 0;
+                font-family: sans-serif;
+            }
+
+            iframe {
+                width: 100%;
+                height: 352px;
+                border: none;
+                border-radius: 12px;
+            }
+
+            button {
+                margin-top: 10px;
+                padding: 8px 14px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+
+    <body>
+
+        <div id="player"></div>
+
+        <button id="reload">
+            🔄 Reload playlist
+        </button>
+
+        <script>
+            const embedUrl = __EMBED_URL__;
+            const player = document.getElementById("player");
+
+            function loadPlayer() {
+                // Remove the old player
+                player.replaceChildren();
+
+                // Create a new Spotify iframe
+                const iframe = document.createElement("iframe");
+
+                iframe.src = embedUrl;
+
+                iframe.allow =
+                    "autoplay; clipboard-write; encrypted-media; " +
+                    "fullscreen; picture-in-picture";
+
+                iframe.loading = "eager";
+
+                player.appendChild(iframe);
+            }
+
+            // Load the player initially
+            loadPlayer();
+
+            // Reload only the Spotify iframe
+            document.getElementById("reload")
+                .addEventListener("click", loadPlayer);
+        </script>
+
+    </body>
+    </html>
+    """
+
+    html = html.replace(
+        "__EMBED_URL__",
+        json.dumps(url)
+    )
+
+    st.iframe(
+        src=html,
+        height=420,
+        width="stretch"
     )
