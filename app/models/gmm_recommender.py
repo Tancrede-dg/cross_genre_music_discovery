@@ -50,6 +50,8 @@ class GMMModel(AbstractModel):
         if configuracao not in configuracoes:
             raise ValueError("Configuração de GMM inválida.")
 
+        self._name = configuracao
+
         caminho_modelo = (
             root / "artifacts" / "models" / "gmm"
             / configuracoes[configuracao]
@@ -108,13 +110,17 @@ class GMMModel(AbstractModel):
 
         return medoides_df
 
-    def recommend(self, track_ids: list[str]) -> list[str]:
+    @property
+    def name(self):
+        return self._name
+
+    def recommend(self, input_track_ids: list[str]) -> list[str]:
 
         # 1. Recuperar as músicas do usuário
-        input_df = self.catalogo.loc[track_ids].reset_index()
+        input_df = self.catalogo.loc[input_track_ids].reset_index()
 
         # 2. Calcular os medoides
-        medoides_df = self.get_input_medoids(track_ids)
+        medoides_df = self.get_input_medoids(input_track_ids)
 
         # 3. Identificar os gêneros proibidos
         generos_input = get_input_genres(input_df)
@@ -133,11 +139,11 @@ class GMMModel(AbstractModel):
 
         # 6. Excluir músicas do input e duplicatas
         candidatas = candidatas[
-            ~candidatas["track_id"].isin(track_ids)
+            ~candidatas["track_id"].isin(input_track_ids)
         ].drop_duplicates(subset="track_id").copy()
 
         # 7. Recuperar coordenadas PCA
-        X_input = self.coordenadas.loc[track_ids].to_numpy()
+        X_input = self.coordenadas.loc[input_track_ids].to_numpy()
 
         X_candidatas = self.coordenadas.loc[
             candidatas["track_id"]

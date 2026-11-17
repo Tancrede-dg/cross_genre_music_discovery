@@ -19,6 +19,11 @@ class AbstractModel(ABC):
     input_size = 10
     output_size = 20
 
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
     @abstractmethod
     def recommend(
         self,

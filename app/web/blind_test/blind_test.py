@@ -1,4 +1,6 @@
 
+import logging
+import sys
 import random
 from uuid import uuid4
 
@@ -10,8 +12,21 @@ import app.spotify.spotify as spo
 from app.web.blind_test.scoring import save_vote
 from app.models.baseline_model import BaselineModel
 from app.models.autoencoder_knn_model import Autoencoder_kNN_Model
+from app.models.gmm_recommender import GMMModel
 
 
+
+
+
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 # ------------------------ Creating (empty) playlists ------------------------
@@ -26,7 +41,7 @@ if "input_playlist_id" not in st.session_state:
 input_playlist_id = st.session_state.input_playlist_id
 
 
-nb_models = 2
+nb_models = 4
 if "recommendation_playlist_ids" not in st.session_state:
     st.session_state.recommendation_playlist_ids = [
         spo.create_playlist(token)
@@ -55,12 +70,6 @@ input_tracks_jazz = pd.read_csv(path / 'jazz.csv')
 spo.add_tracks_to_playlist(token, input_playlist_id, input_tracks_jazz['track_id'])
 spo.display_player_streamlit(input_playlist_id)
 
-# st.iframe(
-#     "https://open.spotify.com/embed/playlist/1rX1RzugQm6ZAUhTRn4fHy",
-#     height=352,
-#     width="stretch"
-# )
-
 
 
 # ------------------------ Load models ------------------------
@@ -76,6 +85,13 @@ models.append(baseline_model)
 # Load autoencoder
 autoencoder_knn_model = Autoencoder_kNN_Model()
 models.append(autoencoder_knn_model)
+
+# Load gmm models
+pca3_gmm_model = GMMModel(configuracao="pca3_tied15")
+models.append(pca3_gmm_model)
+
+pca5_gmm_model = GMMModel(configuracao="pca5_diag30")
+models.append(pca5_gmm_model)
 
 st.write(f'Loaded {len(models)} models')
 st.write('Model list has been shuffled')
@@ -109,17 +125,21 @@ if st.button('Recommend', disabled):
         )
 
         results.append({
-            "model_id": type(model).__name__,
+            "model_id": model.name,
             "track_ids": list(recommendations)
         })
 
     random.shuffle(results)
+
+    logger.debug(f'Results: {results}')
+
 
     st.session_state.trial = {
         "id": str(uuid4()),
         "input_track_ids": input_tracks_jazz["track_id"].tolist(),
         "results": results
     }
+
 
 
 
