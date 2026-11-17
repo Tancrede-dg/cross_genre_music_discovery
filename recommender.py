@@ -4,9 +4,47 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-
+from sklearn.metrics import pairwise_distances
 
 df = pd.read_csv("../cross_genre_music_discovery/raw_data/spotify-tracks-dataset-detailed.csv")
+
+
+def atribuir_clusters(
+# Recebe um dataframe com as músicas imputadas, o dicionário com o modelo de gmm , \\
+    # as features e o nome da coluna que será adicionado no datafram
+    df_musicas,
+    config,
+    features,
+    cluster_col="cluster_gmm"
+):
+    """
+    Atribui clusters a músicas cujas features
+    já estão escaladas.
+
+    Retorna:
+    - DataFrame com a coluna de clusters
+    - Coordenadas no espaço usado pelo modelo
+    """
+
+    # 1. Recuperar as features já escaladas
+    X_scaled = df_musicas[features].to_numpy()
+
+    # 2. Aplicar o PCA treinado, quando existir
+    if config.get("pca") is not None:
+        X_modelo = config["pca"].transform(X_scaled)
+    else:
+        X_modelo = X_scaled
+
+    # 3. Identificar o cluster de cada música
+    clusters = config["model"].predict(X_modelo)
+
+    # 4. Adicionar os clusters ao DataFrame
+    resultado = df_musicas.copy()
+    resultado[cluster_col] = clusters
+
+    # 5. Retornar os dados e as coordenadas
+    return resultado, X_modelo
+
 
 def find_medoids(input_df, X_input, cluster_col="cluster_gmm"):
 
@@ -233,3 +271,47 @@ def recomendar_musicas(
     ].reset_index(drop=True)
 
     return playlist
+
+
+
+def calcular_probabilidades(distancias, modo="seguro"):
+
+    # Temperaturas permitidas
+    temperaturas = {
+        "seguro": 0.3,
+        "surpresa": 1.8
+    }
+
+    # Validar o modo escolhido
+    if modo not in temperaturas:
+        raise ValueError(
+            "Escolha 'seguro' ou 'surpresa'."
+        )
+
+    # Recuperar a temperatura correspondente
+    temperature = temperaturas[modo]
+
+    # Converter as distâncias em array NumPy
+    distancias = np.asarray(distancias, dtype=float)
+
+    if not np.isfinite(distancias).all():
+        raise ValueError("Existem distâncias inválidas.")
+
+    # Normalizar a escala das distâncias
+    escala = max(np.std(distancias), 1e-8)
+
+    dist_normalizadas = (
+        distancias - distancias.min()
+    ) / escala
+
+    # Converter distâncias em pesos
+    logits = -dist_normalizadas / temperature
+    pesos = np.exp(logits - logits.max())
+
+    # Evitar probabilidades numericamente iguais a zero
+    pesos = np.maximum(pesos, 1e-12)
+
+    # Fazer as probabilidades somarem 1
+    probabilidades = pesos / pesos.sum()
+
+    return probabilidades
