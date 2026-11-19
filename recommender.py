@@ -193,9 +193,9 @@ def recomendar_musicas(
     # Quantidade de músicas do input em cada cluster
     contagens = medoides_df.set_index("cluster_gmm")["n_musicas"]
 
-    # Nosso MVP recebe 10 músicas e recomenda 20
-    if contagens.sum() != 10:
-        raise ValueError("O input precisa ter 10 músicas.")
+    # # Nosso MVP recebe 10 músicas e recomenda 20
+    # if contagens.sum() != 10:
+    #     raise ValueError("O input precisa ter 10 músicas.")
 
     if candidatas_df["track_id"].duplicated().any():
         raise ValueError("Existem track_id duplicados.")
