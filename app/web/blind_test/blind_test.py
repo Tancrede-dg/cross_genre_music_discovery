@@ -1,4 +1,6 @@
 
+import logging
+import sys
 import random
 from uuid import uuid4
 
@@ -10,8 +12,39 @@ import app.spotify.spotify as spo
 from app.web.blind_test.scoring import save_vote
 from app.models.baseline_model import BaselineModel
 from app.models.autoencoder_knn_model import Autoencoder_kNN_Model
+from app.models.gmm_recommender import GMMModel
 
 
+
+# ------------------------ Input track lists ------------------------
+
+input_track_lists = [
+    {
+        "name": "Eclética",
+        "filename": "Playlist_ECLETICA.csv"
+    },
+    {
+        "name": "Homogênea",
+        "filename": "Playlist_HOMOGENEA.csv"
+    },
+    {
+        "name": "Intermediária",
+        "filename": "Playlist_INTERMEDIARIA.csv"
+    }
+]
+
+random.shuffle(input_track_lists)
+
+# ------------------------ Logs ------------------------
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 # ------------------------ Creating (empty) playlists ------------------------
@@ -19,14 +52,16 @@ from app.models.autoencoder_knn_model import Autoencoder_kNN_Model
 token = spo.get_access_token()
 
 
+if "input_playlist_ids" not in st.session_state:
+    st.session_state.input_playlist_ids = [
+        spo.create_playlist(token)
+        for _ in range(len(input_track_lists))
+    ]
 
-if "input_playlist_id" not in st.session_state:
-    st.session_state.input_playlist_id = spo.create_playlist(token)
-
-input_playlist_id = st.session_state.input_playlist_id
+input_playlist_ids = st.session_state.input_playlist_ids
 
 
-nb_models = 2
+nb_models = 4
 if "recommendation_playlist_ids" not in st.session_state:
     st.session_state.recommendation_playlist_ids = [
         spo.create_playlist(token)
@@ -36,37 +71,43 @@ if "recommendation_playlist_ids" not in st.session_state:
 recommendation_playlist_ids = st.session_state.recommendation_playlist_ids
 
 
+# ------------------------ Load input tracks ------------------------
+# Temporary code until we have final test track lists
+
 
 root = Path(__file__).resolve().parents[3]
 path = root / "artifacts" / "input_track_lists"
 
+# load input tracks
+for tracklist in input_track_lists:
+    tracklist["track_df"] = pd.read_csv(path / tracklist['filename'])
 
-
-# ------------------------ Load input tracks ------------------------
-# Temporary code until we have final test track lists
-
+# show input track lists
 st.markdown('# Input tracks')
 
-# Load jazz.csv
-input_tracks_jazz = pd.read_csv(path / 'jazz.csv')
+columns = st.columns(len(input_track_lists))
+for i in range(len(columns)):
+    with columns[i]:
+
+        label = chr(65 + i)  # A, B, C...
+        input_track_lists[i]['label'] = label
+        st.subheader(f"Playlist {label}")
+
+        # show Spotify player
+        spo.add_tracks_to_playlist(
+            token,
+            input_playlist_ids[i],
+            input_track_lists[i]["track_df"]['track_id'])
+        spo.display_player_streamlit(input_playlist_ids[i])
 
 
-# show Spotify player
-spo.add_tracks_to_playlist(token, input_playlist_id, input_tracks_jazz['track_id'])
-spo.display_player_streamlit(input_playlist_id)
-
-# st.iframe(
-#     "https://open.spotify.com/embed/playlist/1rX1RzugQm6ZAUhTRn4fHy",
-#     height=352,
-#     width="stretch"
-# )
-
+track_list_names = tuple(list["label"] for list in input_track_lists)
+selected_input_list_label = st.radio('Select a playlist', track_list_names)
 
 
 # ------------------------ Load models ------------------------
 # Add here as many models as you want
 
-st.markdown('# Models')
 models = []
 
 # Load baseline
@@ -77,8 +118,12 @@ models.append(baseline_model)
 autoencoder_knn_model = Autoencoder_kNN_Model()
 models.append(autoencoder_knn_model)
 
-st.write(f'Loaded {len(models)} models')
-st.write('Model list has been shuffled')
+# Load gmm models
+pca3_gmm_model = GMMModel(configuracao="pca3_tied15")
+models.append(pca3_gmm_model)
+
+pca5_gmm_model = GMMModel(configuracao="pca5_diag30")
+models.append(pca5_gmm_model)
 
 # Shuffling the list so that we don't know which model produce which recommendation
 # We probably will have to change this when we will implement the user scoring
@@ -96,30 +141,38 @@ recommendations = []
 if "trial" not in st.session_state:
     st.session_state.trial = None
 
-disabled=st.session_state.trial is not None
+disabled=st.session_state.trial is not None\
+    and selected_input_list_label is not None
 
 if st.button('Recommend', disabled):
 
     results = []
+    input_tracks = next(
+        (list for list in input_track_lists if list["label"] == selected_input_list_label),
+        None
+    )
 
     # calling all models to get recommendations
     for model in models:
+
         recommendations = model.recommend(
-            input_track_ids=input_tracks_jazz['track_id']
+            input_track_ids=input_tracks['track_df']['track_id']
         )
 
         results.append({
-            "model_id": type(model).__name__,
-            "track_ids": list(recommendations)
+            "model_id": model.name,
+            "track_ids": recommendations
         })
 
     random.shuffle(results)
 
     st.session_state.trial = {
         "id": str(uuid4()),
-        "input_track_ids": input_tracks_jazz["track_id"].tolist(),
+        "input_track_ids": input_tracks['track_df']['track_id'].tolist(),
+        "input_track_name": input_tracks['name'],
         "results": results
     }
+
 
 
 
@@ -195,6 +248,7 @@ if trial is not None:
                 vote = {
                     "id": trial["id"],
                     "voter": name.strip(),
+                    "input_track_name": trial["input_track_name"],
                     "input_track_ids": trial["input_track_ids"],
                     "results": scored_results
                 }

@@ -1,17 +1,15 @@
 import requests
 import json
 import re
+import os
+
 import pandas as pd
+
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 
 from spotipy.oauth2 import SpotifyPKCE, CacheFileHandler
 
-
-
-
-CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
-REDIRECT_URI = st.secrets.get("SPOTIPY_REDIRECT_URI")
-REFRESH_TOKEN = st.secrets.get("SPOTIFY_REFRESH_TOKEN")
 
 
 
@@ -29,9 +27,16 @@ def get_access_token():
     Connects to the Cross-Genre Music Discovery app of Spotify and requests an access token
     """
 
+    client_id = get_secret("SPOTIFY_CLIENT_ID")
+    redirect_uri = get_secret("SPOTIPY_REDIRECT_URI")
+    refresh_token = get_secret("SPOTIFY_REFRESH_TOKEN")
+
+    if not all([client_id, redirect_uri, refresh_token]):
+        raise ValueError("Missing Spotify credentials")
+
     auth_manager = SpotifyPKCE(
-        client_id=CLIENT_ID,
-        redirect_uri=REDIRECT_URI,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
         scope="playlist-modify-public",
         cache_handler=CacheFileHandler(
             cache_path=".spotify_token_cache"
@@ -40,7 +45,7 @@ def get_access_token():
     )
 
     # use the refresh token to get an access token
-    token_info = auth_manager.refresh_access_token(REFRESH_TOKEN)
+    token_info = auth_manager.refresh_access_token(refresh_token)
 
     return token_info["access_token"]
 
@@ -226,3 +231,16 @@ def display_player_streamlit(playlist_id):
         height=420,
         width="stretch"
     )
+
+
+def get_secret(name):
+    # First, look for an environment variable
+    value = os.getenv(name)
+    if value is not None:
+        return value
+
+    # Otherwise, use Streamlit secrets
+    try:
+        return st.secrets.get(name)
+    except StreamlitSecretNotFoundError:
+        return None

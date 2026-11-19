@@ -1,0 +1,6 @@
+track_id,track_name,artists,genero_alvo,cluster_gmm,confianca_cluster
+5olDF40pLOsPi0JjaiY37m,De Treta Em Treta,MC Caja;Mc Gibi,funk,4,1.0
+24N4CgmUozgo6lwd2qM33i,Idolatria,Menor MC,funk,4,0.9999999958523347
+29cWhgW69qlqEcji31Dr0D,Edge Of Dawn,Gary Stadler;Stephannie,new-age,7,0.9998586189051153
+5Qj0IHHYHoHaiAc6VXK5hf,Hands Of Silk,Michael Whalen,new-age,7,0.9999152360814856
+0fmwyv8VP8Jh71e87oCHv1,Through Struggle,As I Lay Dying,metalcore,13,0.8847951759094324

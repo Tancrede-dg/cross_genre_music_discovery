@@ -19,6 +19,11 @@ class BaselineModel(AbstractModel):
         self.catalog_clean = pd.read_parquet(root / "artifacts" / "catalog_clean.parquet").set_index("track_id")
 
 
+    @property
+    def name(self):
+        return "Baseline"
+
+
     def recommend(self, input_track_ids):
 
         # retrieve input tracks from scaled catalog
