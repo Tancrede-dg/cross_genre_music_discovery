@@ -3,7 +3,7 @@ from pathlib import Path
 import joblib
 from sklearn.metrics import pairwise_distances
 import pandas as pd
-from recommender import (
+from app.models.recommender import (
     find_medoids,
     get_input_genres,
     get_candidates,
