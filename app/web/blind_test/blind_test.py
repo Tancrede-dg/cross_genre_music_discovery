@@ -148,7 +148,7 @@ if st.button('Recommend', disabled):
 
     results = []
     input_tracks = next(
-        (list for list in input_track_lists if list["label"] == selected_input_list_label),
+        (tracklist for tracklist in input_track_lists if tracklist["label"] == selected_input_list_label),
         None
     )
 
