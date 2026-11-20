@@ -159,6 +159,9 @@ if st.button('Recommend', disabled):
             input_track_ids=input_tracks['track_df']['track_id']
         )
 
+        # limit to 10 tracks
+        recommendations = recommendations[:10]
+
         results.append({
             "model_id": model.name,
             "track_ids": recommendations
