@@ -4,3 +4,5 @@ __pycache__
 *.egg-info/
 .streamlit/secrets.toml
 .spotify_cache
+notebooks/.streamlit/secrets.toml
+notebooks/.streamlit/
